@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fireworks Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 5px rgba(251, 191, 36, 0.8);
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+        
+        /* Scrollbar for settings panel */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(31, 41, 55, 0.5); 
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 10px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas Layer -->
+    <canvas id="canvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="ui-panel" class="absolute top-4 right-4 w-80 bg-gray-900/90 backdrop-blur-md border border-gray-700 text-white p-6 rounded-xl shadow-2xl transition-transform duration-300 transform translate-x-0 max-h-[90vh] flex flex-col z-10">
+        
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-xl font-bold text-amber-400 tracking-wider">PYRO<span class="text-white">GEN</span></h1>
+            <button id="minimize-btn" class="text-gray-400 hover:text-white focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="controls-content" class="space-y-5 overflow-y-auto custom-scroll pr-2">
+            
+            <!-- Status -->
+            <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700 text-sm text-center">
+                <span class="text-gray-400">Click anywhere to launch manually</span>
+            </div>
+
+            <!-- Main Controls -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <label class="text-xs font-semibold uppercase text-gray-400">Auto-Launch</label>
+                    <input type="checkbox" id="auto-launch" checked class="w-4 h-4 accent-amber-500 cursor-pointer">
+                </div>
+                <p class="text-xs text-gray-500 mb-2">Automatically fires random fireworks</p>
+            </div>
+
+            <hr class="border-gray-700">
+
+            <!-- Physics -->
+            <div class="space-y-4">
+                <h2 class="text-sm font-bold text-blue-300">Physics</h2>
+                
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Gravity</span>
+                        <span id="val-gravity" class="text-amber-400">1.0</span>
+                    </div>
+                    <input type="range" id="gravity" min="0.1" max="3.0" step="0.1" value="1.0">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Explosion Force</span>
+                        <span id="val-speed" class="text-amber-400">12</span>
+                    </div>
+                    <input type="range" id="speed" min="5" max="30" step="1" value="12">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Friction (Air Resistance)</span>
+                        <span id="val-friction" class="text-amber-400">0.95</span>
+                    </div>
+                    <input type="range" id="friction" min="0.80" max="0.99" step="0.01" value="0.95">
+                </div>
+            </div>
+
+            <hr class="border-gray-700">
+
+            <!-- Visuals -->
+            <div class="space-y-4">
+                <h2 class="text-sm font-bold text-purple-300">Visuals</h2>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Particle Count</span>
+                        <span id="val-particles" class="text-amber-400">80</span>
+                    </div>
+                    <input type="range" id="particle-count" min="20" max="300" step="10" value="80">
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Trail Fade</span>
+                        <span id="val-fade" class="text-amber-400">20%</span>
+                    </div>
+                    <input type="range" id="fade" min="5" max="50" step="1" value="20">
+                    <p class="text-[10px] text-gray-500 mt-1">Lower = longer trails (heavy performance)</p>
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span>Base Hue</span>
+                        <span id="val-hue" class="text-amber-400">Random</span>
+                    </div>
+                    <input type="range" id="hue" min="0" max="360" step="1" value="0">
+                    <div class="flex items-center mt-2">
+                        <input type="checkbox" id="random-hue" checked class="w-3 h-3 mr-2 accent-purple-500">
+                        <label for="random-hue" class="text-xs text-gray-400">Randomize Colors</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-2">
+                <button id="clear-canvas" class="w-full bg-red-900/30 hover:bg-red-800/50 text-red-200 text-sm py-2 rounded border border-red-800/50 transition-colors">
+                    Clear Sky
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minimize Toggle Button (Visible when panel is hidden/minimized) -->
+    <button id="show-panel-btn" class="hidden absolute top-4 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 z-10">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+    </button>
+
+    <script>
+        // --- Configuration & State ---
+        const config = {
+            autoLaunch: true,
+            gravity: 1.0,
+            speed: 12, // Explosion force
+            friction: 0.95,
+            particleCount: 80,
+            fade: 0.2, // Canvas opacity per frame (trail length)
+            hue: 0,
+            randomHue: true
+        };
+
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let cw = window.innerWidth;
+        let ch = window.innerHeight;
+
+        canvas.width = cw;
+        canvas.height = ch;
+
+        window.addEventListener('resize', () => {
+            cw = window.innerWidth;
+            ch = window.innerHeight;
+            canvas.width = cw;
+            canvas.height = ch;
+        });
+
+        // --- Math Utilities ---
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function calculateDistance(p1x, p1y, p2x, p2y) {
+            let xDistance = p1x - p2x;
+            let yDistance = p1y - p2y;
+            return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
+        }
+
+        // --- Classes ---
+
+        // Firework Class: The rocket that goes up
+        class Firework {
+            constructor(sx, sy, tx, ty) {
+                this.x = sx;
+                this.y = sy;
+                this.sx = sx;
+                this.sy = sy;
+                this.tx = tx;
+                this.ty = ty;
+                this.distanceToTarget = calculateDistance(sx, sy, tx, ty);
+                this.distanceTraveled = 0;
+                // Track current coordinates for trail drawing
+                this.coordinates = [];
+                this.coordinateCount = 3;
+                while(this.coordinateCount--) {
+                    this.coordinates.push([this.x, this.y]);
+                }
+                this.angle = Math.atan2(ty - sy, tx - sx);
+                this.speed = 2;
+                this.acceleration = 1.05;
+                this.brightness = random(50, 70);
+                // Assign hue based on config at launch time
+                this.hue = config.randomHue ? random(0, 360) : config.hue;
+            }
+
+            update(index) {
+                // Remove last coord, add current
+                this.coordinates.pop();
+                this.coordinates.unshift([this.x, this.y]);
+
+                // Accelerate
+                if (this.speed < config.speed) { // Cap launch speed relative to explosion speed a bit
+                     this.speed *= this.acceleration;
+                }
+                
+                const vx = Math.cos(this.angle) * this.speed;
+                const vy = Math.sin(this.angle) * this.speed;
+                
+                this.distanceTraveled = calculateDistance(this.sx, this.sy, this.x + vx, this.y + vy);
+
+                if (this.distanceTraveled >= this.distanceToTarget) {
+                    // Reached target -> Explode
+                    createParticles(this.tx, this.ty, this.hue);
+                    fireworks.splice(index, 1);
+                } else {
+                    this.x += vx;
+                    this.y += vy;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = 'hsl(' + this.hue + ', 100%, ' + this.brightness + '%)';
+                ctx.stroke();
+                
+                // Draw a glowing head
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'hsl(' + this.hue + ', 100%, ' + this.brightness + '%)';
+                ctx.fill();
+            }
+        }
+
+        // Particle Class: The pieces that explode
+        class Particle {
+            constructor(x, y, hue) {
+                this.x = x;
+                this.y = y;
+                this.coordinates = [];
+                this.coordinateCount = 5;
+                while(this.coordinateCount--) {
+                    this.coordinates.push([this.x, this.y]);
+                }
+                
+                // Random angle 0 to 2PI
+                this.angle = random(0, Math.PI * 2);
+                // Speed varies
+                this.speed = random(1, config.speed); 
+                
+                this.friction = config.friction;
+                this.gravity = config.gravity;
+                
+                // Visual variety
+                this.hue = random(hue - 20, hue + 20);
+                this.brightness = random(50, 80);
+                this.alpha = 1;
+                // Decay rate
+                this.decay = random(0.015, 0.03);
+            }
+
+            update(index) {
+                // Trail management
+                this.coordinates.pop();
+                this.coordinates.unshift([this.x, this.y]);
+
+                // Physics
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                
+                // Fade out
+                this.alpha -= this.decay;
+
+                if (this.alpha <= this.decay) {
+                    particles.splice(index, 1);
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = 'hsla(' + this.hue + ', 100%, ' + this.brightness + '%, ' + this.alpha + ')';
+                ctx.stroke();
+            }
+        }
+
+        // --- Main Logic ---
+        const fireworks = [];
+        const particles = [];
+        let limiterTotal = 5;
+        let limiterTick = 0;
+        let timerTotal = 40; // Auto-launch frequency
+        let timerTick = 0;
+        let mousedown = false;
+        let mx, my;
+
+        function createParticles(x, y, hue) {
+            let count = parseInt(config.particleCount);
+            while(count--) {
+                particles.push(new Particle(x, y, hue));
+            }
+        }
+
+        // Main Loop
+        function loop() {
+            requestAnimationFrame(loop);
+
+            // 1. Clear Canvas with transparency for trails
+            // config.fade is 5-50 (percentage). We need 0.05 to 0.5
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = `rgba(0, 0, 0, ${config.fade})`;
+            ctx.fillRect(0, 0, cw, ch);
+            
+            ctx.globalCompositeOperation = 'lighter';
+
+            // 2. Update & Draw Fireworks
+            let i = fireworks.length;
+            while(i--) {
+                fireworks[i].draw();
+                fireworks[i].update(i);
+            }
+
+            // 3. Update & Draw Particles
+            let k = particles.length;
+            while(k--) {
+                particles[k].draw();
+                particles[k].update(k);
+            }
+
+            // 4. Auto Launch Logic
+            if (config.autoLaunch) {
+                if (timerTick >= timerTotal) {
+                    // Launch from random bottom x to random upper y
+                    // Keep target within reasonable bounds
+                    const startX = cw / 2;
+                    const targetX = random(cw * 0.1, cw * 0.9);
+                    const targetY = random(ch * 0.1, ch * 0.5); 
+                    
+                    // Variation: Sometimes launch from sides
+                    if(Math.random() < 0.3) {
+                        fireworks.push(new Firework(random(0, cw), ch, targetX, targetY));
+                    } else {
+                        fireworks.push(new Firework(cw / 2, ch, targetX, targetY));
+                    }
+
+                    timerTick = 0;
+                    // Randomize timing slightly
+                    timerTotal = random(20, 60); 
+                } else {
+                    timerTick++;
+                }
+            }
+
+            // 5. Manual Mouse Launch Limiter
+            if (mousedown) {
+                // Don't spam too many
+                if (limiterTick >= limiterTotal) {
+                    fireworks.push(new Firework(cw / 2, ch, mx, my));
+                    limiterTick = 0;
+                } else {
+                    limiterTick++;
+                }
+            }
+        }
+
+        // --- UI Binding ---
+        const uiPanel = document.getElementById('ui-panel');
+        const controlsContent = document.getElementById('controls-content');
+        const minimizeBtn = document.getElementById('minimize-btn');
+        const showPanelBtn = document.getElementById('show-panel-btn');
+        
+        // Panel Toggle
+        minimizeBtn.addEventListener('click', () => {
+            uiPanel.classList.add('translate-x-[120%]', 'opacity-0');
+            setTimeout(() => {
+                uiPanel.classList.add('hidden');
+                showPanelBtn.classList.remove('hidden');
+            }, 300);
+        });
+
+        showPanelBtn.addEventListener('click', () => {
+            uiPanel.classList.remove('hidden');
+            // Small timeout to allow display:block to apply before transition
+            setTimeout(() => {
+                uiPanel.classList.remove('translate-x-[120%]', 'opacity-0');
+            }, 10);
+            showPanelBtn.classList.add('hidden');
+        });
+
+        // Input Listeners helper
+        function bindInput(id, key, displayId = null, formatFn = (v) => v) {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                
+                // Special logic for checkboxes or specific conversions
+                if(el.type === 'checkbox') {
+                    config[key] = el.checked;
+                } else {
+                    config[key] = val;
+                }
+
+                // Special logic for Fade (mapped)
+                if (key === 'fade') {
+                    config.fade = val / 100;
+                }
+
+                if (displayId) {
+                    document.getElementById(displayId).innerText = formatFn(val);
+                }
+            });
+        }
+
+        // Bind all controls
+        bindInput('auto-launch', 'autoLaunch');
+        
+        bindInput('gravity', 'gravity', 'val-gravity');
+        bindInput('speed', 'speed', 'val-speed');
+        bindInput('friction', 'friction', 'val-friction');
+        
+        bindInput('particle-count', 'particleCount', 'val-particles');
+        
+        bindInput('fade', 'fade', 'val-fade', (v) => v + '%');
+
+        // Hue logic is a bit specific due to checkbox
+        const hueSlider = document.getElementById('hue');
+        const hueCheck = document.getElementById('random-hue');
+        const hueDisplay = document.getElementById('val-hue');
+
+        function updateHueUI() {
+            if (hueCheck.checked) {
+                config.randomHue = true;
+                hueDisplay.innerText = "Random";
+                hueSlider.disabled = true;
+                hueSlider.parentElement.classList.add('opacity-50');
+            } else {
+                config.randomHue = false;
+                config.hue = parseFloat(hueSlider.value);
+                hueDisplay.innerText = hueSlider.value;
+                hueSlider.disabled = false;
+                hueSlider.parentElement.classList.remove('opacity-50');
+            }
+        }
+
+        hueCheck.addEventListener('change', updateHueUI);
+        hueSlider.addEventListener('input', (e) => {
+            config.hue = parseFloat(e.target.value);
+            hueDisplay.innerText = e.target.value;
+        });
+        // Initialize Hue UI state
+        updateHueUI();
+
+        // Clear Button
+        document.getElementById('clear-canvas').addEventListener('click', () => {
+            fireworks.length = 0;
+            particles.length = 0;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+            ctx.fillRect(0, 0, cw, ch);
+        });
+
+        // --- Mouse Interaction ---
+        canvas.addEventListener('mousemove', (e) => {
+            mx = e.clientX;
+            my = e.clientY;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mousedown = true;
+            // Fire immediately on click
+            mx = e.clientX;
+            my = e.clientY;
+            fireworks.push(new Firework(cw / 2, ch, mx, my));
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            mousedown = false;
+        });
+        
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // prevent scrolling
+            mx = e.touches[0].clientX;
+            my = e.touches[0].clientY;
+            mousedown = true;
+            fireworks.push(new Firework(cw / 2, ch, mx, my));
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+             mousedown = false;
+        });
+
+
+        // Start
+        loop();
+
+    </script>
+</body>
+</html>
